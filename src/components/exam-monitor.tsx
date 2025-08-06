@@ -17,7 +17,7 @@ export default function ExamMonitor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [headMovement, setHeadMovement] = useState("Looking around the room frequently.");
@@ -43,10 +43,7 @@ export default function ExamMonitor() {
           const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
           if (permissionStatus.state === 'granted') {
              setHasCameraPermission(true);
-          } else if (permissionStatus.state === 'prompt') {
-            setHasCameraPermission(null); // Will ask when camera is started
-          }
-          else {
+          } else {
             setHasCameraPermission(false);
           }
           
@@ -57,8 +54,10 @@ export default function ExamMonitor() {
         } catch (error) {
             console.error('Error checking camera permissions:', error);
             // Fallback for browsers not supporting permissions.query
-            setHasCameraPermission(null);
+            setHasCameraPermission(false);
         }
+      } else {
+        setHasCameraPermission(false);
       }
     };
     checkCameraPermission();
