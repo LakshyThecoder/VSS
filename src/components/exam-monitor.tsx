@@ -17,7 +17,7 @@ export default function ExamMonitor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [headMovement, setHeadMovement] = useState("Looking around the room frequently.");
@@ -34,39 +34,6 @@ export default function ExamMonitor() {
     setIsCameraOn(false);
   }, []);
 
-  useEffect(() => {
-    // Check for camera permission on mount, only on the client
-    const checkCameraPermission = async () => {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-        try {
-          // Try to get permission without turning on the camera
-          const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
-          if (permissionStatus.state === 'granted') {
-             setHasCameraPermission(true);
-          } else {
-            setHasCameraPermission(false);
-          }
-          
-          permissionStatus.onchange = () => {
-            setHasCameraPermission(permissionStatus.state === 'granted');
-          };
-
-        } catch (error) {
-            console.error('Error checking camera permissions:', error);
-            // Fallback for browsers not supporting permissions.query
-            setHasCameraPermission(false);
-        }
-      } else {
-        setHasCameraPermission(false);
-      }
-    };
-    checkCameraPermission();
-
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera]);
-  
   const startCamera = useCallback(async () => {
     try {
       if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
@@ -88,6 +55,14 @@ export default function ExamMonitor() {
       });
     }
   }, [toast]);
+  
+  useEffect(() => {
+    startCamera();
+    
+    return () => {
+      stopCamera();
+    };
+  }, [startCamera, stopCamera]);
 
   const handleToggleCamera = () => {
     if (isCameraOn) {
@@ -180,30 +155,29 @@ export default function ExamMonitor() {
       <CardContent className="grid md:grid-cols-2 gap-8">
         <div className="flex flex-col gap-6">
           <div className="relative aspect-video w-full bg-muted rounded-lg overflow-hidden border shadow-inner">
-            {isCameraOn ? (
-              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            {!isCameraOn && !hasCameraPermission && (
+              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-4 text-center">
+                   <Alert variant="destructive" className="max-w-sm">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Camera Access Required</AlertTitle>
+                      <AlertDescription>
+                          Please allow camera access to use this feature. You may need to grant permission in your browser settings.
+                      </AlertDescription>
+                  </Alert>
+              </div>
+            )}
+            {!isCameraOn && hasCameraPermission && (
+               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <VideoOff className="h-16 w-16" />
                 <p className="mt-2 font-medium">Camera is off</p>
               </div>
-            )}
-             {hasCameraPermission === false && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4">
-                     <Alert variant="destructive" className="max-w-sm">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Camera Access Required</AlertTitle>
-                        <AlertDescription>
-                            Please allow camera access to use this feature. You may need to grant permission in your browser settings.
-                        </AlertDescription>
-                    </Alert>
-                </div>
             )}
             <canvas ref={canvasRef} className="hidden" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             <Button onClick={handleToggleCamera} variant="outline" disabled={hasCameraPermission === false}>
+             <Button onClick={handleToggleCamera} variant="outline" disabled={!hasCameraPermission}>
               {isCameraOn ? <VideoOff className="mr-2" /> : <Video className="mr-2" />}
               {isCameraOn ? "Stop Camera" : "Start Camera"}
             </Button>
