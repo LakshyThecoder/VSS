@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { analyzeBehavior, type AnalysisResult } from "@/app/actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type AnalysisStatus = "idle" | "suspicious" | "not-suspicious" | "error";
 
@@ -15,8 +16,8 @@ export default function ExamMonitor() {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
+  
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [headMovement, setHeadMovement] = useState("Looking around the room frequently.");
@@ -24,16 +25,26 @@ export default function ExamMonitor() {
   const [lastAnalysis, setLastAnalysis] = useState<AnalysisResult | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>("idle");
 
+  const stopCamera = useCallback(() => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOn(false);
+  }, []);
+
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
       setIsCameraOn(true);
+      setHasCameraPermission(true);
     } catch (err) {
       console.error("Error accessing camera: ", err);
+      setHasCameraPermission(false);
       toast({
         variant: "destructive",
         title: "Camera Error",
@@ -41,23 +52,30 @@ export default function ExamMonitor() {
       });
     }
   }, [toast]);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraOn(false);
-  }, []);
   
   useEffect(() => {
+    // Check for camera permission on mount
+    const checkCameraPermission = async () => {
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                setHasCameraPermission(true);
+                // We got the stream, so we should stop it to not leave the camera on.
+                stream.getTracks().forEach(track => track.stop());
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                setHasCameraPermission(false);
+            }
+        }
+    };
+    if (hasCameraPermission === null) {
+      checkCameraPermission();
+    }
+
     return () => {
       stopCamera();
     };
-  }, [stopCamera]);
+  }, [stopCamera, hasCameraPermission]);
 
   const handleToggleCamera = () => {
     if (isCameraOn) {
@@ -151,18 +169,29 @@ export default function ExamMonitor() {
         <div className="flex flex-col gap-6">
           <div className="relative aspect-video w-full bg-muted rounded-lg overflow-hidden border shadow-inner">
             {isCameraOn ? (
-              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <VideoOff className="h-16 w-16" />
                 <p className="mt-2 font-medium">Camera is off</p>
               </div>
             )}
+             {hasCameraPermission === false && (
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4">
+                     <Alert variant="destructive" className="max-w-sm">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Camera Access Required</AlertTitle>
+                        <AlertDescription>
+                            Please allow camera access to use this feature. You may need to grant permission in your browser settings.
+                        </AlertDescription>
+                    </Alert>
+                </div>
+            )}
             <canvas ref={canvasRef} className="hidden" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             <Button onClick={handleToggleCamera} variant="outline">
+             <Button onClick={handleToggleCamera} variant="outline" disabled={hasCameraPermission === false}>
               {isCameraOn ? <VideoOff className="mr-2" /> : <Video className="mr-2" />}
               {isCameraOn ? "Stop Camera" : "Start Camera"}
             </Button>
