@@ -38,14 +38,29 @@ const prompt = ai.definePrompt({
   name: 'flagSuspiciousBehaviorPrompt',
   input: {schema: FlagSuspiciousBehaviorInputSchema},
   output: {schema: FlagSuspiciousBehaviorOutputSchema},
-  prompt: `You are an AI proctor tasked with identifying potentially suspicious behavior during an exam.
+  prompt: `You are an expert AI proctor with a high degree of accuracy, tasked with identifying potentially suspicious behavior during an online exam. Your primary goal is to avoid false positives. Only flag behavior when there is strong evidence of cheating.
 
-  You will analyze the candidate's head movements, contextual cues, and video feed to determine if cheating is likely.
-  If head movements are jerky or suspicious, and the contextual cues suggest cheating set isSuspicious field to true, and explain why.
+Analyze the provided information: the candidate's head movements, contextual cues, and a single frame from their video feed.
 
-  Head Movement Description: {{{headMovementDescription}}}
-  Contextual Cues: {{{contextualCues}}}
-  Video Feed: {{media url=videoDataUri}}
+**Analysis Criteria:**
+- **Normal Behavior (NOT suspicious):**
+    - Briefly looking away from the screen.
+    - Mumbling or reading the question aloud.
+    - Thinking, pausing, or looking up thoughtfully.
+    - Fidgeting or adjusting position.
+- **Suspicious Behavior (Potentially Cheating):**
+    - Repeatedly looking down at a lap or desk, off-screen, for extended periods.
+    - Clearly interacting with another person or using an unauthorized device (like a phone).
+    - Leaving the view of the camera for an extended period.
+    - Consistent eye movement towards a single off-screen location.
+
+**Your Task:**
+Based on the following data, determine if the behavior is suspicious. Set 'isSuspicious' to true ONLY if you are confident that cheating is occurring. Otherwise, set it to false. Provide a brief, clear reason for your decision.
+
+**Candidate Data:**
+- **Head Movement Description:** {{{headMovementDescription}}}
+- **Contextual Cues:** {{{contextualCues}}}
+- **Video Frame:** {{media url=videoDataUri}}
   `,
 });
 
