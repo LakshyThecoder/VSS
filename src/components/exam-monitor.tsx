@@ -34,8 +34,45 @@ export default function ExamMonitor() {
     setIsCameraOn(false);
   }, []);
 
+  useEffect(() => {
+    // Check for camera permission on mount, only on the client
+    const checkCameraPermission = async () => {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        try {
+          // Try to get permission without turning on the camera
+          const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          if (permissionStatus.state === 'granted') {
+             setHasCameraPermission(true);
+          } else if (permissionStatus.state === 'prompt') {
+            setHasCameraPermission(null); // Will ask when camera is started
+          }
+          else {
+            setHasCameraPermission(false);
+          }
+          
+          permissionStatus.onchange = () => {
+            setHasCameraPermission(permissionStatus.state === 'granted');
+          };
+
+        } catch (error) {
+            console.error('Error checking camera permissions:', error);
+            // Fallback for browsers not supporting permissions.query
+            setHasCameraPermission(null);
+        }
+      }
+    };
+    checkCameraPermission();
+
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+  
   const startCamera = useCallback(async () => {
     try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+        throw new Error("Media devices not supported");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -52,30 +89,6 @@ export default function ExamMonitor() {
       });
     }
   }, [toast]);
-  
-  useEffect(() => {
-    // Check for camera permission on mount
-    const checkCameraPermission = async () => {
-        if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                setHasCameraPermission(true);
-                // We got the stream, so we should stop it to not leave the camera on.
-                stream.getTracks().forEach(track => track.stop());
-            } catch (error) {
-                console.error('Error accessing camera:', error);
-                setHasCameraPermission(false);
-            }
-        }
-    };
-    if (hasCameraPermission === null) {
-      checkCameraPermission();
-    }
-
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera, hasCameraPermission]);
 
   const handleToggleCamera = () => {
     if (isCameraOn) {
@@ -86,7 +99,7 @@ export default function ExamMonitor() {
   };
 
   const handleAnalyze = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !isCameraOn) return;
 
     setIsLoading(true);
     setLastAnalysis(null);
